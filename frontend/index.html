@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KitchenOS | Recipe Management</title>
+    <style>
+        :root { --dark: #2c3e50; --green: #27ae60; --blue: #2980b9; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Header */
+        header { background: var(--dark); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .res-input { display: flex; align-items: center; gap: 10px; }
+        .res-input input { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid var(--blue); text-align: center; font-weight: bold; }
+
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* Sidebar Form */
+        .sidebar { width: 340px; background: white; border-right: 1px solid #ddd; padding: 25px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; }
+        .sidebar h3 { margin-top: 0; color: var(--dark); }
+        .sidebar input, .sidebar textarea { padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        
+        /* Content Area */
+        .content { flex: 1; padding: 30px; overflow-y: auto; }
+        .search-container { max-width: 650px; margin-bottom: 25px; }
+        .search-box { width: 100%; padding: 18px; font-size: 1.2rem; border: 2px solid var(--blue); border-radius: 10px; box-sizing: border-box; outline: none; }
+
+        /* Recipe Cards */
+        .recipe-card { background: white; padding: 30px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-left: 10px solid var(--green); margin-bottom: 30px; position: relative; }
+        .recipe-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .recipe-header h2 { margin: 0; color: var(--dark); font-size: 1.8rem; }
+        .yield-badge { font-weight: bold; color: var(--green); background: #e8f5e9; padding: 6px 14px; border-radius: 20px; font-size: 0.95rem; }
+        .instructions-box { background: #fffde7; padding: 20px; border-radius: 10px; border: 1px solid #f9e79f; font-size: 1.35rem; line-height: 1.6; color: #333; }
+
+        /* Buttons */
+        button { cursor: pointer; border: none; border-radius: 6px; font-weight: bold; padding: 12px; transition: 0.2s; }
+        .btn-save { background: var(--green); color: white; margin-top: 10px; width: 100%; font-size: 1rem; }
+        .btn-save:hover { background: #219150; }
+        .btn-del { background: #e74c3c; color: white; margin-top: 20px; }
+        .btn-del:hover { background: #c0392b; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-size: 1.6rem; letter-spacing: 1px;">👨‍🍳 <strong>KitchenOS</strong></div>
+    <div class="res-input">
+        <label style="font-size: 0.85rem; font-weight: bold; color: #bdc3c7;">RESTAURANT ID:</label>
+        <input type="number" id="resId" value="1" onchange="load()">
+    </div>
+</header>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <h3>New Entry</h3>
+        <label style="font-size: 0.8rem; color: #666;">Title</label>
+        <input type="text" id="title" placeholder="e.g. Garlic Pasta">
+        <label style="font-size: 0.8rem; color: #666;">Yield</label>
+        <input type="text" id="yield" placeholder="e.g. 2 Bowls">
+        <label style="font-size: 0.8rem; color: #666;">Cooking Steps</label>
+        <textarea id="instr" rows="6" placeholder="1. Boil... 2. Sauté..."></textarea>
+        <button class="btn-save" onclick="add()">Save Recipe</button>
+    </div>
+
+    <div class="content">
+        <div class="search-container">
+            <input type="text" id="query" class="search-box" placeholder="🔍 Search current menu..." oninput="load()">
+        </div>
+        <div id="recipeList"></div>
+    </div>
+</div>
+
+<script>
+    async function load() {
+        const id = document.getElementById('resId').value;
+        const q = document.getElementById('query').value.trim();
+        const listDiv = document.getElementById('recipeList');
+        
+        try {
+            const res = await fetch(`/api/recipes?q=${q}`, { 
+                headers: {'X-Restaurant-ID': id} 
+            });
+            const data = await res.json();
+            
+            if (data.length === 0) {
+                listDiv.innerHTML = `<div style="text-align:center; padding:60px; color:#7f8c8d; font-size:1.2rem; border: 2px dashed #ccc; border-radius:10px;">No recipes match your search.</div>`;
+                return;
+            }
+
+            listDiv.innerHTML = data.map(r => `
+                <div class="recipe-card">
+                    <div class="recipe-header">
+                        <h2>${r.title}</h2>
+                        <span class="yield-badge">${r.yield}</span>
+                    </div>
+                    <div class="instructions-box">
+                        <strong>PREPARATION:</strong><br>${r.instructions}
+                    </div>
+                    <button class="btn-del" onclick="del(${r.id})">Delete from Menu</button>
+                </div>
+            `).join('');
+        } catch (e) {
+            listDiv.innerHTML = `<div style="color:red">Server connection error.</div>`;
+        }
+    }
+
+    async function add() {
+        const id = document.getElementById('resId').value;
+        const payload = {
+            title: document.getElementById('title').value,
+            yield: document.getElementById('yield').value,
+            instructions: document.getElementById('instr').value
+        };
+
+        if (!payload.title || !payload.instructions) {
+            return alert("Please provide at least a title and instructions.");
+        }
+
+        await fetch('/api/recipes', { 
+            method: 'POST', 
+            headers: {'X-Restaurant-ID': id, 'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        // Clear form
+        ['title', 'yield', 'instr'].forEach(id => document.getElementById(id).value = '');
+        load();
+    }
+
+    async function del(id) {
+        const rid = document.getElementById('resId').value;
+        if (confirm("Permanently remove this recipe?")) {
+            await fetch(`/api/recipes/${id}`, { 
+                method: 'DELETE', 
+                headers: {'X-Restaurant-ID': rid} 
+            });
+            load();
+        }
+    }
+
+    // Initial load
+    load();
+</script>
+</body>
+</html>
