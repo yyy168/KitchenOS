@@ -9,22 +9,24 @@ int main() {
     httplib::Server svr;
     RecipeService service;
 
-    // 1. Seed Data 
-    // We pass 0 for the ID because RecipeService::addRecipe handles unique ID generation internally.
+    // 1. Seed Data
     service.addRecipe({
         0, 1, "Classic Carbonara", 
+        "Spaghetti, Eggs, Guanciale, Pecorino Romano, Black Pepper",
         "1. Boil pasta. 2. Whisk eggs and cheese. 3. Combine with pasta and guanciale.", 
         "2 Portions"
     });
 
     service.addRecipe({
         0, 1, "Tomato Basil Soup", 
+        "Tomatoes, Fresh Basil, Heavy Cream, Garlic, Onion",
         "1. Roast tomatoes. 2. Blend with basil and cream. 3. Simmer.", 
         "4 Servings"
     });
 
     service.addRecipe({
         0, 1, "Chocolate Brownies", 
+        "Dark Chocolate, Butter, Sugar, Eggs, Flour, Cocoa Powder",
         "1. Mix dry ingredients. 2. Fold in melted butter. 3. Bake at 180C for 25m.", 
         "12 Squares"
     });
@@ -51,11 +53,14 @@ int main() {
             for (size_t i = 0; i < results.size(); ++i) {
                 json += "{\"id\":" + std::to_string(results[i].id) + 
                         ",\"title\":\"" + results[i].title + "\"" +
+                        ",\"ingredients\":\"" + results[i].ingredients + "\"" + // New field
                         ",\"yield\":\"" + results[i].yield + "\"" +
                         ",\"instructions\":\"" + results[i].instructions + "\"}";
                 if (i < results.size() - 1) json += ",";
             }
             json += "]";
+            
+            res.set_header("Content-Type", "application/json");
             res.set_content(json, "application/json");
         } catch (...) { 
             res.status = 400; 
@@ -67,19 +72,26 @@ int main() {
         try {
             int res_id = std::stoi(req.get_header_value("X-Restaurant-ID"));
             
-            // Simple lambda to extract values from the raw JSON body
             auto extract = [&](std::string key) {
                 size_t pos = req.body.find("\"" + key + "\":\"");
-                if (pos == std::string::npos) return std::string("N/A");
+                if (pos == std::string::npos) return std::string("");
                 size_t start = pos + key.length() + 4;
                 size_t end = req.body.find("\"", start);
                 return req.body.substr(start, end - start);
             };
             
-            // service.addRecipe handles the ID assignment
-            service.addRecipe({0, res_id, extract("title"), extract("instructions"), extract("yield")});
+            // service.addRecipe now returns the new ID
+            int newId = service.addRecipe({
+                0, res_id, extract("title"), extract("ingredients"), extract("instructions"), extract("yield")
+            });
             
-            res.set_content("{\"status\":\"ok\"}", "application/json");
+            if (newId != -1) {
+                res.status = 201; // Created
+                res.set_header("Content-Type", "application/json");
+                res.set_content("{\"id\":" + std::to_string(newId) + ",\"status\":\"ok\"}", "application/json");
+            } else {
+                res.status = 400;
+            }
         } catch (...) { 
             res.status = 400; 
         }
@@ -93,6 +105,7 @@ int main() {
             
             if (service.deleteRecipe(res_id, rec_id)) {
                 res.status = 200; 
+                res.set_header("Content-Type", "application/json");
                 res.set_content("{\"status\":\"deleted\"}", "application/json");
             } else {
                 res.status = 404;

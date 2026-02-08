@@ -17,6 +17,8 @@ struct Recipe {
     int restaurantId;
     // Descriptive name of the dish (e.g., "Classic Carbonara")
     std::string title;
+    // Essential ingredients of the dish
+    std::string ingredients;
     // Step-by-step cooking directions
     std::string instructions;
     // Output quantity (e.g., "4 Servings" or "2 Liters")
@@ -50,7 +52,7 @@ private:
     mutable std::shared_mutex mtx; 
     
     // Internal counter to ensure unique IDs across the system
-    int next_id = 0;
+    int next_id = 1;
 
     // Helper to normalize strings for case-insensitive comparison.
     std::string toLower(std::string s) {
@@ -65,30 +67,49 @@ public:
      * @brief Adds a recipe and assigns it a unique system ID.
      * @param r The recipe data (ID field is ignored/overwritten).
      */
-    void addRecipe(Recipe r) {
+    int addRecipe(Recipe r) {
+        // Defensive Check: Ensure basic data is present
+        if (r.title.empty() || r.restaurantId <= 0) {
+            return -1; 
+        }
         // Write Lock: Prevents anyone else from reading or writing during insertion
         std::unique_lock lock(mtx);
         r.id = next_id++; 
-        storage.push_back(r);
+        int assignedId = r.id;
+        storage.push_back(std::move(r)); // Use move for efficiency
+        return assignedId;
     }
 
     /**
      * @brief Searches for recipes belonging to a specific restaurant.
      * @param res_id Filter by restaurant ownership (Multi-tenancy).
-     * @param query Partial string match for titles (Case-insensitive).
+     * @param query Partial string match for titles or ingredients (Case-insensitive).
      * @return A filtered vector of recipes.
      */
     std::vector<Recipe> search(int res_id, std::string query) {
         // Read Lock: Multiple threads can search simultaneously
         std::shared_lock lock(mtx);
         std::vector<Recipe> results;
+        
+        if (query.empty()) {
+            // Optimization: If query is empty, just grab everything for this restaurant
+            for (const auto& r : storage) {
+                if (r.restaurantId == res_id) {
+                    results.push_back(r);
+                }
+            }
+            return results;
+        }
+
         std::string lowerQuery = toLower(query);
 
         for (const auto& r : storage) {
-            // Multi-tenancy check: ensure data isolation between restaurants
             if (r.restaurantId == res_id) {
-                // If query is empty, return all; otherwise, match lowercase title
-                if (query.empty() || toLower(r.title).find(lowerQuery) != std::string::npos) {
+                // Search both the title AND the ingredients field
+                bool matchTitle = toLower(r.title).find(lowerQuery) != std::string::npos;
+                bool matchIngredients = toLower(r.ingredients).find(lowerQuery) != std::string::npos;
+
+                if (matchTitle || matchIngredients) {
                     results.push_back(r);
                 }
             }
