@@ -1,7 +1,7 @@
 # KitchenOS Architecture Review
 
 ## Design Philosophy
-The system follows a **Minimalist High-Performance** approach. By choosing **C++17** for the backend, we demonstrate high-performance capabilities and memory efficiency. By avoiding heavy frameworks, the entire application remains under 1MB, boots in milliseconds, and has a near-zero memory footprint.
+The system follows a Minimalist High-Performance approach. By choosing **C++17** for the backend, we demonstrate high-performance capabilities and memory efficiency. By avoiding heavy frameworks, the entire application remains under 1MB,  and has a near-zero memory footprint.
 
 ## Data Strategy & Concurrency
 Given the requirements of 1,000 recipes and 10,000 requests/day, a traditional SQL database was bypassed in favor of a thread-safe in-memory store.
@@ -9,7 +9,7 @@ Given the requirements of 1,000 recipes and 10,000 requests/day, a traditional S
 - **In-Memory Storage:** Used a `std::vector` of structs for sub-millisecond data access.
 - **Concurrency:** Implemented `std::shared_mutex` (Readers-Writer lock) to allow simultaneous search operations while maintaining thread safety during recipe edits.
 
-## 💾 Data Persistence & Production Readiness
+## Data Persistence & Production Readiness
 - **Current State:** The system uses a volatile in-memory store. Data is reset on server restart. 
 - **Reasoning:** This was chosen to fulfill the "Zero-Dependency" requirement, ensuring the project runs instantly in any environment without database configuration.
 - **Production Roadmap:** In a real-world scenario, this `RecipeService` would be updated to:

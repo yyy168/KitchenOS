@@ -11,7 +11,7 @@ This project is fully optimized and **tested for GitHub Codespaces**. To run the
    ```bash
    chmod +x run.sh && ./run.sh
 
-3. **Lauch the UI** Open the UI:
+3. **Launch the UI**:
 When the terminal displays ✅ **KitchenOS Backend is live**, click the **"Open in Browser"** pop-up.
 
 If you miss the pop-up, go to the **Ports** tab in the bottom panel and click the link for port **8080**.
